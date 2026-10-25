@@ -1,0 +1,59 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci-throwaway
+          POSTGRES_DB: cims_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci -d cims_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Throw-away service container only; never a real database.
+      TEST_DATABASE_URL: postgresql://ci:ci-throwaway@127.0.0.1:5432/cims_test
+      DIRECT_URL: postgresql://ci:ci-throwaway@127.0.0.1:5432/cims_test
+      DATABASE_URL: postgresql://ci:ci-throwaway@127.0.0.1:5432/cims_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      - name: Validate Prisma schema
+        run: npx prisma validate
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Format check
+        run: npm run format:check
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Apply migrations to the CI database
+        run: npx prisma migrate deploy
+      - name: Migration status
+        run: npx prisma migrate status
+      - name: SQL-level constraint and concurrency tests
+        run: npm run test:db
+      - name: API integration and security tests
+        run: npm run test:integration
+      - name: Build
+        run: npm run build
+      - name: Export OpenAPI document
+        run: npm run openapi:export

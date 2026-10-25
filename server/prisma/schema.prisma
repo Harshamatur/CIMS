@@ -1,0 +1,288 @@
+// CIMS — Chemical Inventory and Issue Management System (fictional prototype)
+// Prisma 7: connection URLs live in prisma.config.ts (migrations) and the
+// runtime driver adapter (src/db/client.ts), NOT in this file.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  EMPLOYEE
+  ADMIN
+  STOREKEEPER
+
+  @@map("role")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+
+  @@map("user_status")
+}
+
+enum UnitType {
+  MASS
+  VOLUME
+  COUNT
+
+  @@map("unit_type")
+}
+
+enum BaseUnit {
+  g
+  ml
+  piece
+
+  @@map("base_unit")
+}
+
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PARTIALLY_ISSUED
+  ISSUED
+  CANCELLED
+
+  @@map("request_status")
+}
+
+enum Decision {
+  APPROVED
+  REJECTED
+
+  @@map("decision")
+}
+
+enum TransactionType {
+  RECEIPT
+  ISSUE
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  REVERSAL
+
+  @@map("transaction_type")
+}
+
+model User {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeCode String     @unique @map("employee_code") @db.VarChar(32)
+  fullName     String     @map("full_name") @db.VarChar(150)
+  email        String?    @unique @db.VarChar(254)
+  passwordHash String     @map("password_hash")
+  role         Role
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  chemicalsCreated  Chemical[]
+  requests          ChemicalRequest[] @relation("RequestRequester")
+  requestsDecided   ChemicalRequest[] @relation("RequestDecider")
+  approvalActions   ApprovalAction[]
+  stockTransactions StockTransaction[]
+  auditLogs         AuditLog[]
+
+  @@index([role, status])
+  @@map("users")
+}
+
+model Chemical {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chemicalCode      String   @unique @map("chemical_code") @db.VarChar(40)
+  name              String   @db.VarChar(200)
+  description       String?
+  category          String?  @db.VarChar(100)
+  hazardNotes       String?  @map("hazard_notes")
+  storageLocation   String?  @map("storage_location") @db.VarChar(60)
+  minimumStockAlert Int      @default(0) @map("minimum_stock_alert")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdBy         String   @map("created_by") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  creator           User               @relation(fields: [createdBy], references: [id])
+  packSizes         PackSize[]
+  balances          InventoryBalance[]
+  requestItems      RequestItem[]
+  stockTransactions StockTransaction[]
+
+  @@index([name])
+  @@index([storageLocation])
+  @@index([isActive])
+  @@map("chemicals")
+}
+
+model PackSize {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chemicalId   String   @map("chemical_id") @db.Uuid
+  label        String   @db.VarChar(40)
+  unitType     UnitType @map("unit_type")
+  baseUnit     BaseUnit @map("base_unit")
+  baseQuantity Decimal  @map("base_quantity") @db.Decimal(12, 3)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  chemical          Chemical           @relation(fields: [chemicalId], references: [id])
+  balance           InventoryBalance?
+  requestItems      RequestItem[]
+  stockTransactions StockTransaction[]
+
+  // One packaging configuration per chemical (label + unit + size).
+  @@unique([chemicalId, label])
+  @@unique([chemicalId, baseUnit, baseQuantity])
+  // Target of composite foreign keys that prove "pack size belongs to chemical".
+  @@unique([id, chemicalId])
+  @@map("pack_sizes")
+}
+
+model InventoryBalance {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chemicalId       String   @map("chemical_id") @db.Uuid
+  packSizeId       String   @map("pack_size_id") @db.Uuid
+  onHandQuantity   Int      @default(0) @map("on_hand_quantity")
+  reservedQuantity Int      @default(0) @map("reserved_quantity")
+  minimumQuantity  Int      @default(0) @map("minimum_quantity")
+  version          Int      @default(1)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  chemical Chemical @relation(fields: [chemicalId], references: [id])
+  packSize PackSize @relation(fields: [packSizeId, chemicalId], references: [id, chemicalId])
+
+  @@unique([chemicalId, packSizeId])
+  @@unique([packSizeId])
+  @@map("inventory_balances")
+}
+
+model ChemicalRequest {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestNumber   String?       @unique @map("request_number") @db.VarChar(30)
+  requestedBy     String        @map("requested_by") @db.Uuid
+  purpose         String
+  department      String?       @db.VarChar(100)
+  status          RequestStatus @default(DRAFT)
+  submittedAt     DateTime?     @map("submitted_at") @db.Timestamptz(6)
+  decidedBy       String?       @map("decided_by") @db.Uuid
+  decidedAt       DateTime?     @map("decided_at") @db.Timestamptz(6)
+  rejectionReason String?       @map("rejection_reason")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  requester       User             @relation("RequestRequester", fields: [requestedBy], references: [id])
+  decider         User?            @relation("RequestDecider", fields: [decidedBy], references: [id])
+  items           RequestItem[]
+  approvalActions ApprovalAction[]
+
+  @@index([status, submittedAt])
+  @@index([requestedBy, createdAt])
+  @@index([submittedAt])
+  @@map("chemical_requests")
+}
+
+model RequestItem {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId        String   @map("request_id") @db.Uuid
+  chemicalId       String   @map("chemical_id") @db.Uuid
+  packSizeId       String   @map("pack_size_id") @db.Uuid
+  requestedQuantity Int     @map("requested_quantity")
+  approvedQuantity Int?     @map("approved_quantity")
+  issuedQuantity   Int      @default(0) @map("issued_quantity")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  request  ChemicalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  chemical Chemical        @relation(fields: [chemicalId], references: [id])
+  packSize PackSize        @relation(fields: [packSizeId, chemicalId], references: [id, chemicalId])
+  stockTransactions StockTransaction[]
+
+  // No duplicate / contradictory lines for the same pack size in one request.
+  @@unique([requestId, packSizeId])
+  @@index([chemicalId])
+  @@map("request_items")
+}
+
+model ApprovalAction {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId  String   @map("request_id") @db.Uuid
+  reviewedBy String   @map("reviewed_by") @db.Uuid
+  decision   Decision
+  comments   String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  request  ChemicalRequest @relation(fields: [requestId], references: [id])
+  reviewer User            @relation(fields: [reviewedBy], references: [id])
+
+  // Prototype policy: a request receives exactly one decision.
+  @@unique([requestId])
+  @@index([reviewedBy])
+  @@map("approval_actions")
+}
+
+model StockTransaction {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chemicalId      String          @map("chemical_id") @db.Uuid
+  packSizeId      String          @map("pack_size_id") @db.Uuid
+  transactionType TransactionType @map("transaction_type")
+  quantity        Int
+  requestItemId   String?         @map("request_item_id") @db.Uuid
+  performedBy     String          @map("performed_by") @db.Uuid
+  reason          String?
+  idempotencyKey  String?         @unique @map("idempotency_key") @db.VarChar(200)
+  reversalOfId    String?         @unique @map("reversal_of_id") @db.Uuid
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  chemical    Chemical          @relation(fields: [chemicalId], references: [id])
+  packSize    PackSize          @relation(fields: [packSizeId, chemicalId], references: [id, chemicalId])
+  requestItem RequestItem?      @relation(fields: [requestItemId], references: [id])
+  actor       User              @relation(fields: [performedBy], references: [id])
+  reversalOf  StockTransaction? @relation("Reversal", fields: [reversalOfId], references: [id])
+  reversedBy  StockTransaction? @relation("Reversal")
+
+  @@index([chemicalId, createdAt])
+  @@index([packSizeId, createdAt])
+  @@index([transactionType, createdAt])
+  @@index([performedBy, createdAt])
+  @@index([requestItemId])
+  @@index([createdAt])
+  @@map("stock_transactions")
+}
+
+model AuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String   @db.VarChar(80)
+  entityType  String   @map("entity_type") @db.VarChar(60)
+  entityId    String?  @map("entity_id") @db.Uuid
+  beforeData  Json?    @map("before_data") @db.JsonB
+  afterData   Json?    @map("after_data") @db.JsonB
+  requestId   String?  @map("request_id") @db.VarChar(100)
+  ipAddress   String?  @map("ip_address") @db.Inet
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User? @relation(fields: [actorUserId], references: [id])
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+// Table used by connect-pg-simple (column names/types are dictated by that library).
+model SessionRecord {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "IDX_session_expire")
+  @@map("session")
+}
