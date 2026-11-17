@@ -3,7 +3,7 @@ import { EnvError, loadEnv } from "../../src/config/env.js";
 
 const valid = {
   APP_ORIGIN: "http://localhost:5173",
-  DATABASE_URL: "postgresql://user:SUPERSECRETPW@host/db",
+  DATABASE_URL: "postgresql://user:test-only-placeholder@host/db",
   SESSION_SECRET: "x".repeat(40),
 };
 
@@ -16,7 +16,7 @@ describe("environment validation", () => {
   });
   it("fails with variable names, never values", () => {
     try {
-      loadEnv({ DATABASE_URL: "mysql://user:SUPERSECRETPW@host/db", SESSION_SECRET: "short" });
+      loadEnv({ DATABASE_URL: "mysql://user:test-only-placeholder@host/db", SESSION_SECRET: "short" });
       expect.unreachable();
     } catch (e) {
       expect(e).toBeInstanceOf(EnvError);

@@ -9,7 +9,7 @@ import { insertUser } from "./pg.js";
 export const HAS_PRISMA_CLIENT = existsSync(
   fileURLToPath(new URL("../../src/generated/prisma/client.ts", import.meta.url)),
 );
-export const PASSWORD = "correct-horse-battery-staple";
+export const PASSWORD = "test-only-password";
 
 export async function buildTestApp(): Promise<Express> {
   const { createApp } = await import("../../src/app.js");
