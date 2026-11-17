@@ -18,6 +18,9 @@ const envSchema = z.object({
   SESSION_SECRET: z.string().min(32, "must be at least 32 characters"),
   SESSION_COOKIE_NAME: z.string().min(1).default("cims.sid"),
   SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(72).default(8),
+  BUSINESS_TIMEZONE: z.string().default("Asia/Kolkata").refine((value) => {
+    try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; } catch { return false; }
+  }, "must be a valid IANA time zone"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
   SWAGGER_ENABLED: z.enum(["true", "false"]).optional(),

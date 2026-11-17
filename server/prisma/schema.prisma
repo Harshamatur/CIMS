@@ -158,7 +158,7 @@ model InventoryBalance {
   chemical Chemical @relation(fields: [chemicalId], references: [id])
   packSize PackSize @relation(fields: [packSizeId, chemicalId], references: [id, chemicalId])
 
-  @@unique([chemicalId, packSizeId])
+  @@unique([packSizeId, chemicalId])
   @@unique([packSizeId])
   @@map("inventory_balances")
 }

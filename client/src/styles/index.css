@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* Design tokens: restrained industrial-enterprise palette. */
+@theme {
+  --font-sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  --color-navy-950: #081a30;
+  --color-navy-900: #0f2745;
+  --color-navy-800: #163459;
+  --color-navy-700: #1f4573;
+
+  --color-brand-50: #eef5fd;
+  --color-brand-100: #d9e8fa;
+  --color-brand-600: #1d5fb8;
+  --color-brand-700: #174d98;
+
+  --color-ink: #0f1c2e;
+  --color-muted: #52627a;
+  --color-line: #d5dde8;
+  --color-surface: #ffffff;
+  --color-canvas: #f4f6fa;
+
+  --color-ok-50: #e9f7ef;
+  --color-ok-700: #17663a;
+  --color-warn-50: #fff5e0;
+  --color-warn-700: #8a5a00;
+  --color-bad-50: #fdecec;
+  --color-bad-700: #a32020;
+  --color-info-50: #eaf1fb;
+  --color-info-700: #1b4f94;
+
+  --radius-card: 0.625rem;
+  --shadow-card: 0 1px 2px rgb(15 28 46 / 0.06), 0 1px 1px rgb(15 28 46 / 0.04);
+}
+
+html {
+  color-scheme: light;
+}
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible keyboard focus everywhere (WCAG 2.2 focus appearance). */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand-600);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

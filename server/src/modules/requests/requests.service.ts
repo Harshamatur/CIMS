@@ -2,7 +2,7 @@ import { conflict, forbidden, notFound, unprocessable } from "../../common/error
 import { pageMeta, skipTake, type PageQuery } from "../../common/pagination.js";
 import { requestVisibilityWhere, type Actor } from "../../common/permissions.js";
 import { remainingToIssue } from "../../common/quantity.js";
-import { assertTransition, type RequestStatus } from "../../common/state-machine.js";
+import { assertTransition, REQUEST_STATUSES, type RequestStatus } from "../../common/state-machine.js";
 import { getEnv } from "../../config/env.js";
 import { getPrisma, type Tx } from "../../db/client.js";
 import { recordAudit, type ServiceContext } from "../audit/audit.service.js";
@@ -27,7 +27,21 @@ const detailInclude = {
     orderBy: { createdAt: "asc" as const },
     include: {
       chemical: { select: { id: true, chemicalCode: true, name: true, storageLocation: true } },
-      packSize: { select: { id: true, label: true, unitType: true } },
+      packSize: {
+        select: {
+          id: true,
+          label: true,
+          unitType: true,
+          balance: {
+            select: { onHandQuantity: true, reservedQuantity: true, minimumQuantity: true },
+          },
+        },
+      },
+      stockTransactions: {
+        where: { transactionType: "ISSUE" as const },
+        orderBy: { createdAt: "asc" as const },
+        include: { actor: person },
+      },
     },
   },
   approvalActions: { orderBy: { createdAt: "asc" as const }, include: { reviewer: person } },
@@ -102,11 +116,6 @@ export async function getRequestDetail(
     include: detailInclude,
   });
   if (!row) throw notFound("Request");
-  const issues = await db.stockTransaction.findMany({
-    where: { transactionType: "ISSUE", requestItem: { requestId: id } },
-    orderBy: { createdAt: "asc" },
-    include: { actor: person },
-  });
   const r = row as unknown as RequestRow & {
     items: {
       id: string;
@@ -114,7 +123,13 @@ export async function getRequestDetail(
       approvedQuantity: number | null;
       issuedQuantity: number;
       chemical: { id: string; chemicalCode: string; name: string; storageLocation: string | null };
-      packSize: { id: string; label: string; unitType: "MASS" | "VOLUME" | "COUNT" };
+      packSize: {
+        id: string;
+        label: string;
+        unitType: "MASS" | "VOLUME" | "COUNT";
+        balance: { onHandQuantity: number; reservedQuantity: number; minimumQuantity: number } | null;
+      };
+      stockTransactions: { id: string; quantity: number; createdAt: Date; actor: Person }[];
     }[];
     approvalActions: {
       id: string;
@@ -130,20 +145,33 @@ export async function getRequestDetail(
     items: r.items.map((i) => ({
       id: i.id,
       chemical: i.chemical,
-      packSize: i.packSize,
+      packSize: { id: i.packSize.id, label: i.packSize.label, unitType: i.packSize.unitType },
+      availability: i.packSize.balance
+        ? {
+            available: i.packSize.balance.onHandQuantity - i.packSize.balance.reservedQuantity,
+            lowStock:
+              i.packSize.balance.minimumQuantity > 0 &&
+              i.packSize.balance.onHandQuantity - i.packSize.balance.reservedQuantity <=
+                i.packSize.balance.minimumQuantity,
+          }
+        : null,
       requestedQuantity: i.requestedQuantity,
       approvedQuantity: i.approvedQuantity,
       issuedQuantity: i.issuedQuantity,
       remainingToIssue: remainingToIssue(i.approvedQuantity, i.issuedQuantity),
     })),
     approvalActions: r.approvalActions,
-    issues: issues.map((t) => ({
-      id: t.id,
-      requestItemId: t.requestItemId as string,
-      quantity: t.quantity,
-      createdAt: t.createdAt,
-      performedBy: t.actor,
-    })),
+    issues: r.items
+      .flatMap((i) =>
+        i.stockTransactions.map((t) => ({
+          id: t.id,
+          requestItemId: i.id,
+          quantity: t.quantity,
+          createdAt: t.createdAt,
+          performedBy: t.actor,
+        })),
+      )
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
   };
 }
 
@@ -179,6 +207,23 @@ export async function listRequests(
     })),
     meta: pageMeta(q, total),
   };
+}
+
+export async function countRequests(actor: Actor, requestedBy?: string) {
+  const where = {
+    AND: [requestVisibilityWhere(actor), ...(requestedBy ? [{ requestedBy }] : [])],
+  };
+  const grouped = await getPrisma().chemicalRequest.groupBy({
+    by: ["status"],
+    where,
+    _count: { _all: true },
+  });
+  const counts = Object.fromEntries(REQUEST_STATUSES.map((status) => [status, 0])) as Record<
+    RequestStatus,
+    number
+  >;
+  for (const row of grouped) counts[row.status] = row._count._all;
+  return { data: counts };
 }
 
 export async function createDraft(

@@ -4,8 +4,7 @@ A **fictional proof-of-work prototype** of a chemical inventory, requisition, ap
 industrial Chemistry Division. It is **not** an officially approved, certified or production-ready system, and all
 bundled data is invented demonstration data.
 
-This repository currently contains the **backend only** (`server/`). A separate React PWA frontend is a later phase and
-will consume the documented REST API under `/api/v1`.
+The repository contains the **backend** (`server/`) and the **core-journey frontend** (`client/`: login, request, approve, issue). Reports, audit, stock administration and the PWA layer are later phases. See `client/README.md` to run the UI and `docs/frontend-*.md` for its design and API mapping.
 
 ## Verification status (read this first)
 
@@ -18,6 +17,8 @@ will consume the documented REST API under `/api/v1`.
 | TypeScript strict type-check | **Partially verified:** the only root error is the missing generated Prisma Client; ~53 further errors are `any` cascades from it. Code that depends on the client has **not** been type-checked |
 | `prisma generate / validate / migrate`, Prisma-based services, the Express app at runtime | **NOT verified** — Prisma's engine host (`binaries.prisma.sh`) was unreachable in the authoring sandbox |
 | API integration + security suites (25 tests, `tests/integration`, `tests/security`) | **Written, NOT executed** (auto-skipped without a generated client) |
+| Frontend (`client/`): type-check, lint, production build, 51 unit/screen tests against a **mocked** `fetch` | **Executed** in the authoring sandbox |
+| Frontend against the real backend (full journey in a browser) | **NOT verified** here; run it on your machine (`client/README.md`) |
 | Neon connectivity, deployment | **NOT verified** (documented only) |
 | Whether `0001_init` matches what `prisma migrate dev` would generate | **NOT verified** — see `docs/testing.md` for the drift check you must run first |
 

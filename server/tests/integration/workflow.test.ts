@@ -72,6 +72,19 @@ describe.skipIf(!HAS_PRISMA_CLIENT)("request -> approval -> issue -> reports jou
       })
     ).body.data;
 
+  it("returns grouped request counts without exposing other users' requests", async () => {
+    const d = await draft(1);
+    await post(employee, `/requests/${d.id}/submit`);
+
+    const employeeCounts = await get(employee, "/requests/counts");
+    expect(employeeCounts.status).toBe(200);
+    expect(employeeCounts.body.data.SUBMITTED).toBe(1);
+
+    const storekeeperCounts = await get(storekeeper, "/requests/counts");
+    expect(storekeeperCounts.status).toBe(200);
+    expect(storekeeperCounts.body.data.SUBMITTED).toBe(0);
+  });
+
   it("runs the complete demonstration journey and keeps stock, ledger and audit consistent", async () => {
     const d = await draft(4);
     expect(d.status).toBe("DRAFT");
@@ -88,6 +101,7 @@ describe.skipIf(!HAS_PRISMA_CLIENT)("request -> approval -> issue -> reports jou
     const approved = await post(admin, `/requests/${d.id}/approve`, { comments: "OK" });
     expect(approved.status).toBe(200);
     expect(approved.body.data.status).toBe("APPROVED");
+    expect(approved.body.data.items[0].availability).toEqual({ available: 10, lowStock: false });
     // Approval alone must NOT deduct stock.
     expect((await get(admin, "/inventory")).body.data[0].onHandQuantity).toBe(10);
 
@@ -121,6 +135,7 @@ describe.skipIf(!HAS_PRISMA_CLIENT)("request -> approval -> issue -> reports jou
       { "Idempotency-Key": "journey-issue-0002" },
     );
     expect(rest.body.data.status).toBe("ISSUED");
+    expect(rest.body.data.issues).toHaveLength(2);
     expect((await get(admin, "/inventory")).body.data[0].onHandQuantity).toBe(6);
 
     // Employee sees the final status; ledger and audit trail reflect every step.

@@ -5,12 +5,15 @@ import {
   cancelBody,
   createRequestBody,
   listRequestsQuery,
+  requestCountsQuery,
+  requestCountsResponse,
   requestListResponse,
   requestResponse,
   updateRequestBody,
 } from "./requests.schemas.js";
 import {
   cancelRequest,
+  countRequests,
   createDraft,
   getRequestDetail,
   listRequests,
@@ -32,6 +35,20 @@ export function registerRequestRoutes(api: ApiRouter): void {
     handler: async ({ query, user }) => {
       if (query.requestedBy && query.requestedBy !== user.id && user.role !== "ADMIN") throw forbidden();
       return listRequests(user, query);
+    },
+  });
+  api.route({
+    method: "get",
+    path: "/requests/counts",
+    summary: "Count visible requests by status",
+    description: "Returns grouped counts using the same request visibility rules as the request list.",
+    tags: ["Requests"],
+    access: "authenticated",
+    query: requestCountsQuery,
+    response: requestCountsResponse,
+    handler: async ({ query, user }) => {
+      if (query.requestedBy && query.requestedBy !== user.id && user.role !== "ADMIN") throw forbidden();
+      return countRequests(user, query.requestedBy);
     },
   });
   api.route({

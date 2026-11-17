@@ -14,6 +14,7 @@ import { registerApprovalRoutes } from "./modules/approvals/approvals.routes.js"
 import { registerAuditRoutes } from "./modules/audit/audit.routes.js";
 import { registerAuthRoutes } from "./modules/auth/auth.routes.js";
 import { registerChemicalRoutes } from "./modules/chemicals/chemicals.routes.js";
+import { registerDashboardRoutes } from "./modules/dashboard/dashboard.routes.js";
 import { createHealthRouter } from "./modules/health/health.routes.js";
 import { registerInventoryRoutes } from "./modules/inventory/inventory.routes.js";
 import { registerReportRoutes } from "./modules/reports/reports.routes.js";
@@ -28,6 +29,7 @@ export function buildApi(validateResponses: boolean): ApiRouter {
   registerAuthRoutes(api);
   registerUserRoutes(api);
   registerChemicalRoutes(api);
+  registerDashboardRoutes(api);
   registerInventoryRoutes(api);
   registerRequestRoutes(api);
   registerApprovalRoutes(api);

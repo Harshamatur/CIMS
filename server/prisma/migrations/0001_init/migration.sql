@@ -152,7 +152,7 @@ CREATE UNIQUE INDEX "pack_sizes_chemical_id_label_key" ON "pack_sizes"("chemical
 CREATE UNIQUE INDEX "pack_sizes_chemical_id_base_unit_base_quantity_key" ON "pack_sizes"("chemical_id", "base_unit", "base_quantity");
 CREATE UNIQUE INDEX "pack_sizes_id_chemical_id_key" ON "pack_sizes"("id", "chemical_id");
 
-CREATE UNIQUE INDEX "inventory_balances_chemical_id_pack_size_id_key" ON "inventory_balances"("chemical_id", "pack_size_id");
+CREATE UNIQUE INDEX "inventory_balances_pack_size_id_chemical_id_key" ON "inventory_balances"("pack_size_id", "chemical_id");
 CREATE UNIQUE INDEX "inventory_balances_pack_size_id_key" ON "inventory_balances"("pack_size_id");
 
 CREATE UNIQUE INDEX "chemical_requests_request_number_key" ON "chemical_requests"("request_number");

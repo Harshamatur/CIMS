@@ -73,6 +73,8 @@ export const listRequestsQuery = pageQuerySchema.extend(dateRangeQuery.shape).ex
   requestedBy: z.uuid().optional().openapi({ description: "ADMIN only: filter by requester" }),
 });
 
+export const requestCountsQuery = z.strictObject({ requestedBy: z.uuid().optional() });
+
 const personSchema = z.object({ id: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 
 export const requestItemSchema = z
@@ -85,6 +87,7 @@ export const requestItemSchema = z
       storageLocation: z.string().nullable(),
     }),
     packSize: z.object({ id: z.uuid(), label: z.string(), unitType: unitTypeSchema }),
+    availability: z.object({ available: z.number().int(), lowStock: z.boolean() }).nullable(),
     requestedQuantity: z.number().int(),
     approvedQuantity: z.number().int().nullable(),
     issuedQuantity: z.number().int(),
@@ -136,3 +139,14 @@ export const requestDetailSchema = requestSummarySchema
 
 export const requestResponse = envelope(requestDetailSchema);
 export const requestListResponse = pagedEnvelope(requestSummarySchema);
+export const requestCountsResponse = envelope(
+  z.object({
+    DRAFT: z.number().int().nonnegative(),
+    SUBMITTED: z.number().int().nonnegative(),
+    APPROVED: z.number().int().nonnegative(),
+    REJECTED: z.number().int().nonnegative(),
+    PARTIALLY_ISSUED: z.number().int().nonnegative(),
+    ISSUED: z.number().int().nonnegative(),
+    CANCELLED: z.number().int().nonnegative(),
+  }),
+);
