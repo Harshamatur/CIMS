@@ -1,7 +1,7 @@
 import { ApiRouter } from "../../common/api-router.js";
 import { getEnv } from "../../config/env.js";
 import { loginRateLimiter } from "../../middleware/rate-limit.js";
-import { csrfResponse, okResponse } from "./auth.schemas.js";
+import { capabilitiesResponse, csrfResponse, okResponse } from "./auth.schemas.js";
 import { loginBody, sessionResponse } from "./auth.schemas.js";
 import { ensureCsrfToken, login, logout } from "./auth.service.js";
 
@@ -9,6 +9,16 @@ export function registerAuthRoutes(api: ApiRouter): void {
   const env = getEnv();
   // Login attempts are rate-limited per IP before any credential work happens.
   api.router.use("/auth/login", loginRateLimiter(env));
+
+  api.route({
+    method: "get",
+    path: "/auth/capabilities",
+    summary: "Current role feature capabilities",
+    tags: ["Auth"],
+    access: "authenticated",
+    response: capabilitiesResponse,
+    handler: async () => ({ data: { allowAdminIssue: env.ALLOW_ADMIN_ISSUE } }),
+  });
 
   api.route({
     method: "get",

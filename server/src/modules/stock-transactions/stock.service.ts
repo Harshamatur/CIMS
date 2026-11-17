@@ -13,6 +13,7 @@ export const transactionInclude = {
   actor: { select: { id: true, employeeCode: true, fullName: true } },
   requestItem: { select: { requestId: true } },
   reversalOf: { select: { transactionType: true } },
+  reversedBy: { select: { id: true } },
 } as const;
 
 type TxRow = {
@@ -28,6 +29,7 @@ type TxRow = {
   reason: string | null;
   reversalOfId: string | null;
   reversalOf: { transactionType: string } | null;
+  reversedBy: { id: string } | null;
 };
 
 /** Direction is explicit in the DTO so no consumer has to guess whether a positive number is incoming or outgoing. */
@@ -54,6 +56,7 @@ export function toTransactionDto(r: TxRow) {
     performedBy: r.actor,
     reason: r.reason,
     reversalOfId: r.reversalOfId,
+    reversedById: r.reversedBy?.id ?? null,
   };
 }
 

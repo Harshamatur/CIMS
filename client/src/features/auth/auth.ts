@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
 import { api, ApiError, setCsrfToken } from "@/lib/api-client";
-import type { Envelope, SessionUser } from "@/types/api";
+import type { Envelope, SessionCapabilities, SessionUser } from "@/types/api";
 
 export const ME_KEY = ["me"] as const;
 
@@ -24,6 +24,14 @@ export async function fetchMe(): Promise<SessionUser | null> {
 
 export const useSession = () =>
   useQuery({ queryKey: ME_KEY, queryFn: fetchMe, staleTime: 60_000, retry: false });
+
+export const useSessionCapabilities = (enabled = true) =>
+  useQuery({
+    queryKey: ["session-capabilities"],
+    queryFn: async () => (await api<Envelope<SessionCapabilities>>("/auth/capabilities")).data,
+    enabled,
+    staleTime: 60_000,
+  });
 
 // Set when any API call reports an expired session so the login page can explain why the user is back there.
 let sessionExpired = false;

@@ -5,7 +5,7 @@ import { Drawer } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useCurrentUser, useLogout } from "@/features/auth/auth";
+import { useCurrentUser, useLogout, useSessionCapabilities } from "@/features/auth/auth";
 import { describeError } from "@/lib/errors";
 import { navFor } from "./nav";
 
@@ -28,9 +28,10 @@ const ROLE_LABEL = { EMPLOYEE: "Employee", ADMIN: "Administrator", STOREKEEPER: 
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const user = useCurrentUser();
+  const capabilities = useSessionCapabilities(user.role === "ADMIN");
   return (
     <nav aria-label="Main" className="flex-1 space-y-1 px-3 py-4">
-      {navFor(user.role).map(({ to, label, Icon, end }) => (
+      {navFor(user.role, capabilities.data?.allowAdminIssue === true).map(({ to, label, Icon, end }) => (
         <NavLink
           key={to}
           to={to}

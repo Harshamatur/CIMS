@@ -62,6 +62,7 @@ export const transactionSchema = z
     performedBy: z.object({ id: z.uuid(), employeeCode: z.string(), fullName: z.string() }),
     reason: z.string().nullable(),
     reversalOfId: z.uuid().nullable(),
+    reversedById: z.uuid().nullable(),
   })
   .openapi("StockTransaction");
 

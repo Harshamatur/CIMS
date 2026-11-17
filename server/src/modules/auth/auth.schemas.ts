@@ -26,4 +26,5 @@ export const sessionResponse = envelope(z.object({ user: sessionUserSchema, csrf
   "SessionResponse",
 );
 export const csrfResponse = envelope(z.object({ csrfToken: z.string() }));
+export const capabilitiesResponse = envelope(z.object({ allowAdminIssue: z.boolean() }));
 export const okResponse = envelope(z.object({ ok: z.literal(true) }));

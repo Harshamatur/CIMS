@@ -13,6 +13,7 @@ import {
   createUserRow,
   get,
   loginAs,
+  patch,
   post,
   type Session,
 } from "../helpers/api.js";
@@ -83,6 +84,60 @@ describe.skipIf(!HAS_PRISMA_CLIENT)("request -> approval -> issue -> reports jou
     const storekeeperCounts = await get(storekeeper, "/requests/counts");
     expect(storekeeperCounts.status).toBe(200);
     expect(storekeeperCounts.body.data.SUBMITTED).toBe(0);
+  });
+
+  it("returns role-scoped dashboard summaries from request and stock records", async () => {
+    const d = await draft(3);
+    await post(employee, `/requests/${d.id}/submit`);
+    await patch(admin, `/inventory/${packSizeId}/threshold`, { minimumQuantity: 10 });
+
+    const employeeSummary = await get(employee, "/dashboard/summary");
+    expect(employeeSummary.status).toBe(200);
+    expect(employeeSummary.body.data).toMatchObject({
+      role: "EMPLOYEE",
+      awaitingReview: 1,
+      approved: 0,
+      partiallyIssued: 0,
+      fullyIssued: 0,
+    });
+
+    const adminSummary = await get(admin, "/dashboard/summary");
+    expect(adminSummary.status).toBe(200);
+    expect(adminSummary.body.data).toMatchObject({
+      role: "ADMIN",
+      totalRequests: 1,
+      awaitingDecision: 1,
+      lowStockAlerts: 1,
+    });
+    expect(adminSummary.body.data.pendingRequests.map((r: { id: string }) => r.id)).toContain(d.id);
+
+    expect((await get(storekeeper, "/dashboard/summary")).body.data).toMatchObject({
+      role: "STOREKEEPER",
+      readyToIssue: 0,
+      partiallyIssued: 0,
+      lowStockAlerts: 1,
+    });
+    await post(admin, `/requests/${d.id}/approve`, {});
+    expect((await get(storekeeper, "/dashboard/summary")).body.data.readyToIssue).toBe(1);
+    const issued = await post(
+      storekeeper,
+      `/requests/${d.id}/issue`,
+      { lines: [{ requestItemId: d.items[0].id, quantity: 1 }] },
+      { "Idempotency-Key": "dashboard-summary-issue" },
+    );
+    expect(issued.status).toBe(200);
+
+    const afterIssue = await get(storekeeper, "/dashboard/summary");
+    expect(afterIssue.body.data).toMatchObject({
+      readyToIssue: 0,
+      partiallyIssued: 1,
+      issuedToday: 1,
+      lowStockAlerts: 1,
+    });
+    expect((await get(employee, "/dashboard/summary")).body.data).toMatchObject({
+      awaitingReview: 0,
+      partiallyIssued: 1,
+    });
   });
 
   it("runs the complete demonstration journey and keeps stock, ledger and audit consistent", async () => {

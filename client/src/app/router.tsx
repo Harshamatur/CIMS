@@ -1,5 +1,17 @@
 import { createBrowserRouter, createMemoryRouter, type RouteObject } from "react-router";
+import type { ReactNode } from "react";
 import { RequireAuth, RequireRole } from "./guards";
+import { useCurrentUser, useSessionCapabilities } from "@/features/auth/auth";
+import { FullPageLoading } from "@/components/feedback/states";
+
+function IssueDeskAccess({ children }: { children: ReactNode }) {
+  const user = useCurrentUser();
+  const capabilities = useSessionCapabilities(user.role === "ADMIN");
+  if (user.role === "STOREKEEPER" || (user.role === "ADMIN" && capabilities.data?.allowAdminIssue))
+    return children;
+  if (user.role === "ADMIN" && capabilities.isPending) return <FullPageLoading />;
+  return <RequireRole roles={["STOREKEEPER"]}>{children}</RequireRole>;
+}
 
 export const appRoutes: RouteObject[] = [
   {
@@ -25,14 +37,26 @@ export const appRoutes: RouteObject[] = [
         path: "requests",
         lazy: async () => {
           const { MyRequestsPage } = await import("@/features/requests/my-requests-page");
-          return { Component: () => <RequireRole roles={["EMPLOYEE"]}><MyRequestsPage /></RequireRole> };
+          return {
+            Component: () => (
+              <RequireRole roles={["EMPLOYEE"]}>
+                <MyRequestsPage />
+              </RequireRole>
+            ),
+          };
         },
       },
       {
         path: "requests/new",
         lazy: async () => {
           const { NewRequestPage } = await import("@/features/requests/new-request-page");
-          return { Component: () => <RequireRole roles={["EMPLOYEE"]}><NewRequestPage /></RequireRole> };
+          return {
+            Component: () => (
+              <RequireRole roles={["EMPLOYEE"]}>
+                <NewRequestPage />
+              </RequireRole>
+            ),
+          };
         },
       },
       {
@@ -60,9 +84,9 @@ export const appRoutes: RouteObject[] = [
           const { IssueDeskPage } = await import("@/features/stock-issues/issue-desk-page");
           return {
             Component: () => (
-              <RequireRole roles={["STOREKEEPER"]}>
+              <IssueDeskAccess>
                 <IssueDeskPage />
-              </RequireRole>
+              </IssueDeskAccess>
             ),
           };
         },
@@ -71,35 +95,65 @@ export const appRoutes: RouteObject[] = [
         path: "inventory",
         lazy: async () => {
           const { InventoryPage } = await import("@/features/inventory/inventory-page");
-          return { Component: () => <RequireRole roles={["ADMIN"]}><InventoryPage /></RequireRole> };
+          return {
+            Component: () => (
+              <RequireRole roles={["ADMIN"]}>
+                <InventoryPage />
+              </RequireRole>
+            ),
+          };
         },
       },
       {
         path: "stock-transactions",
         lazy: async () => {
           const { TransactionsPage } = await import("@/features/stock-transactions/transactions-page");
-          return { Component: () => <RequireRole roles={["ADMIN", "STOREKEEPER"]}><TransactionsPage /></RequireRole> };
+          return {
+            Component: () => (
+              <RequireRole roles={["ADMIN", "STOREKEEPER"]}>
+                <TransactionsPage />
+              </RequireRole>
+            ),
+          };
         },
       },
       {
         path: "users",
         lazy: async () => {
           const { UsersPage } = await import("@/features/users/users-page");
-          return { Component: () => <RequireRole roles={["ADMIN"]}><UsersPage /></RequireRole> };
+          return {
+            Component: () => (
+              <RequireRole roles={["ADMIN"]}>
+                <UsersPage />
+              </RequireRole>
+            ),
+          };
         },
       },
       {
         path: "reports",
         lazy: async () => {
           const { ReportsPage } = await import("@/features/reports/reports-page");
-          return { Component: () => <RequireRole roles={["ADMIN", "STOREKEEPER"]}><ReportsPage /></RequireRole> };
+          return {
+            Component: () => (
+              <RequireRole roles={["ADMIN", "STOREKEEPER"]}>
+                <ReportsPage />
+              </RequireRole>
+            ),
+          };
         },
       },
       {
         path: "audit-logs",
         lazy: async () => {
           const { AuditPage } = await import("@/features/audit/audit-page");
-          return { Component: () => <RequireRole roles={["ADMIN"]}><AuditPage /></RequireRole> };
+          return {
+            Component: () => (
+              <RequireRole roles={["ADMIN"]}>
+                <AuditPage />
+              </RequireRole>
+            ),
+          };
         },
       },
       {

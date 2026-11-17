@@ -1,8 +1,8 @@
 import {
-  ClipboardCheck,
-  ClipboardList,
   ArrowLeftRight,
   Boxes,
+  ClipboardCheck,
+  ClipboardList,
   FileBarChart,
   FilePlus2,
   FlaskConical,
@@ -19,22 +19,40 @@ export interface NavItem {
   label: string;
   Icon: LucideIcon;
   end?: boolean;
-  roles?: readonly Role[];
+  /** Display-only access metadata. Every endpoint independently checks the user's role. */
+  roles: readonly Role[];
 }
 
-const ALL: NavItem[] = [
-  { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
-  { to: "/chemicals", label: "Chemicals", Icon: FlaskConical },
-  { to: "/requests/new", label: "New request", Icon: FilePlus2, roles: ["EMPLOYEE"] },
-  { to: "/requests", label: "My requests", Icon: ClipboardList, end: true, roles: ["EMPLOYEE"] },
-  { to: "/review", label: "Review queue", Icon: ClipboardCheck, roles: ["ADMIN"] },
-  { to: "/issue", label: "Issue desk", Icon: PackageCheck, roles: ["STOREKEEPER"] },
-  { to: "/inventory", label: "Inventory management", Icon: Boxes, roles: ["ADMIN"] },
-  { to: "/stock-transactions", label: "Stock transactions", Icon: ArrowLeftRight, roles: ["ADMIN", "STOREKEEPER"] },
-  { to: "/users", label: "User management", Icon: Users, roles: ["ADMIN"] },
-  { to: "/reports", label: "Reports", Icon: FileBarChart, roles: ["ADMIN", "STOREKEEPER"] },
-  { to: "/audit-logs", label: "Audit logs", Icon: ScrollText, roles: ["ADMIN"] },
-];
+const NAV_BY_ROLE: Record<Role, readonly NavItem[]> = {
+  EMPLOYEE: [
+    { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true, roles: ["EMPLOYEE"] },
+    { to: "/chemicals", label: "Chemicals", Icon: FlaskConical, roles: ["EMPLOYEE"] },
+    { to: "/requests/new", label: "New request", Icon: FilePlus2, roles: ["EMPLOYEE"] },
+    { to: "/requests", label: "My requests", Icon: ClipboardList, end: true, roles: ["EMPLOYEE"] },
+  ],
+  ADMIN: [
+    { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true, roles: ["ADMIN"] },
+    { to: "/review", label: "Review queue", Icon: ClipboardCheck, roles: ["ADMIN"] },
+    { to: "/chemicals", label: "Chemicals", Icon: FlaskConical, roles: ["ADMIN"] },
+    { to: "/inventory", label: "Inventory management", Icon: Boxes, roles: ["ADMIN"] },
+    { to: "/stock-transactions", label: "Stock transactions", Icon: ArrowLeftRight, roles: ["ADMIN"] },
+    { to: "/users", label: "User management", Icon: Users, roles: ["ADMIN"] },
+    { to: "/reports", label: "Reports", Icon: FileBarChart, roles: ["ADMIN"] },
+    { to: "/audit-logs", label: "Audit logs", Icon: ScrollText, roles: ["ADMIN"] },
+  ],
+  STOREKEEPER: [
+    { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true, roles: ["STOREKEEPER"] },
+    { to: "/issue", label: "Issue desk", Icon: PackageCheck, roles: ["STOREKEEPER"] },
+    { to: "/chemicals", label: "Chemicals", Icon: FlaskConical, roles: ["STOREKEEPER"] },
+    { to: "/stock-transactions", label: "Stock transactions", Icon: ArrowLeftRight, roles: ["STOREKEEPER"] },
+    { to: "/reports", label: "Reports", Icon: FileBarChart, roles: ["STOREKEEPER"] },
+  ],
+};
 
-/** Navigation reflects the role for convenience only; the backend enforces every permission. */
-export const navFor = (role: Role): NavItem[] => ALL.filter((i) => !i.roles || i.roles.includes(role));
+const ADMIN_ISSUE: NavItem = { to: "/issue", label: "Issue desk", Icon: PackageCheck, roles: ["ADMIN"] };
+
+/** Sidebar configuration only; the backend remains the permission authority. */
+export const navFor = (role: Role, allowAdminIssue = false): readonly NavItem[] => {
+  const items = NAV_BY_ROLE[role] ?? [];
+  return role === "ADMIN" && allowAdminIssue ? [...items, ADMIN_ISSUE] : items;
+};

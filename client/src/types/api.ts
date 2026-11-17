@@ -28,6 +28,9 @@ export interface SessionUser {
   role: Role;
   status: UserStatus;
 }
+export interface SessionCapabilities {
+  allowAdminIssue: boolean;
+}
 
 export interface PageMeta {
   page: number;
@@ -37,26 +40,104 @@ export interface PageMeta {
 }
 export type RequestCounts = Record<RequestStatus, number>;
 export type DashboardSummary =
-  | { role: "EMPLOYEE"; awaitingReview: number; approved: number; partiallyIssued: number; fullyIssued: number }
-  | { role: "ADMIN"; totalRequests: number; awaitingDecision: number; approved: number; partiallyIssued: number; fullyIssued: number; rejected: number; lowStockAlerts: number; pendingRequests: RequestSummary[]; recentActivity: { id: string; action: string; entityType: string; createdAt: string; actorName: string | null }[]; lowStockItems: LowStockItem[]; recentTransactions: StockTransaction[] }
-  | { role: "STOREKEEPER"; readyToIssue: number; partiallyIssued: number; issuedToday: number; lowStockAlerts: number; pendingIssueRequests: RequestSummary[]; recentHandovers: StockTransaction[]; lowStockItems: LowStockItem[]; recentTransactions: StockTransaction[] };
-export interface LowStockItem { chemicalCode: string; chemicalName: string; packLabel: string; availableQuantity: number; minimumQuantity: number }
+  | {
+      role: "EMPLOYEE";
+      awaitingReview: number;
+      approved: number;
+      partiallyIssued: number;
+      fullyIssued: number;
+    }
+  | {
+      role: "ADMIN";
+      totalRequests: number;
+      awaitingDecision: number;
+      approved: number;
+      partiallyIssued: number;
+      fullyIssued: number;
+      rejected: number;
+      lowStockAlerts: number;
+      pendingRequests: RequestSummary[];
+      recentActivity: {
+        id: string;
+        action: string;
+        entityType: string;
+        createdAt: string;
+        actorName: string | null;
+      }[];
+      lowStockItems: LowStockItem[];
+      recentTransactions: StockTransaction[];
+    }
+  | {
+      role: "STOREKEEPER";
+      readyToIssue: number;
+      partiallyIssued: number;
+      issuedToday: number;
+      lowStockAlerts: number;
+      pendingIssueRequests: RequestSummary[];
+      recentHandovers: StockTransaction[];
+      lowStockItems: LowStockItem[];
+      recentTransactions: StockTransaction[];
+    };
+export interface LowStockItem {
+  chemicalCode: string;
+  chemicalName: string;
+  packLabel: string;
+  availableQuantity: number;
+  minimumQuantity: number;
+}
 export interface InventoryBalance {
-  id: string; chemicalId: string; chemicalCode: string; chemicalName: string; storageLocation: string | null;
-  packSizeId: string; packLabel: string; unitType: UnitType; baseUnit: BaseUnit; baseQuantity: string;
-  chemicalActive: boolean; packActive: boolean; onHandQuantity: number; reservedQuantity: number;
-  availableQuantity: number; minimumQuantity: number; lowStock: boolean; version: number; updatedAt: string;
+  id: string;
+  chemicalId: string;
+  chemicalCode: string;
+  chemicalName: string;
+  storageLocation: string | null;
+  packSizeId: string;
+  packLabel: string;
+  unitType: UnitType;
+  baseUnit: BaseUnit;
+  baseQuantity: string;
+  chemicalActive: boolean;
+  packActive: boolean;
+  onHandQuantity: number;
+  reservedQuantity: number;
+  availableQuantity: number;
+  minimumQuantity: number;
+  lowStock: boolean;
+  version: number;
+  updatedAt: string;
 }
 export type TransactionType = "RECEIPT" | "ISSUE" | "ADJUSTMENT_IN" | "ADJUSTMENT_OUT" | "REVERSAL";
 export interface StockTransaction {
-  id: string; createdAt: string; transactionType: TransactionType; direction: "IN" | "OUT"; quantity: number;
-  chemical: { id: string; chemicalCode: string; name: string }; packSize: { id: string; label: string; unitType: string };
-  requestItemId: string | null; requestId: string | null; performedBy: Person; reason: string | null; reversalOfId: string | null;
+  id: string;
+  createdAt: string;
+  transactionType: TransactionType;
+  direction: "IN" | "OUT";
+  quantity: number;
+  chemical: { id: string; chemicalCode: string; name: string };
+  packSize: { id: string; label: string; unitType: string };
+  requestItemId: string | null;
+  requestId: string | null;
+  performedBy: Person;
+  reason: string | null;
+  reversalOfId: string | null;
+  reversedById: string | null;
 }
-export interface ManagedUser extends SessionUser { lastLoginAt: string | null; createdAt: string; updatedAt: string }
+export interface ManagedUser extends SessionUser {
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface AuditEntry {
-  id: string; createdAt: string; action: string; entityType: string; entityId: string | null;
-  actor: Person | null; beforeData: unknown; afterData: unknown; requestId: string | null; ipAddress: string | null;
+  id: string;
+  createdAt: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  actor: Person | null;
+  beforeData: unknown;
+  afterData: unknown;
+  requestId: string | null;
+  ipAddress: string | null;
 }
 export interface Paged<T> {
   data: T[];

@@ -13,7 +13,10 @@ export function ReviewQueuePage() {
         { label: "Rejected", value: "REJECTED" },
         { label: "Draft", value: "DRAFT" },
         { label: "Cancelled", value: "CANCELLED" },
-        { label: "All requests in scope", value: "DRAFT,SUBMITTED,APPROVED,REJECTED,PARTIALLY_ISSUED,ISSUED,CANCELLED" },
+        {
+          label: "All requests in scope",
+          value: "DRAFT,SUBMITTED,APPROVED,REJECTED,PARTIALLY_ISSUED,ISSUED,CANCELLED",
+        },
       ]}
       emptyTitle="Nothing is waiting for review"
       emptyText="New submissions will appear here."

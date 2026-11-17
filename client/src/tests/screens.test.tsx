@@ -19,7 +19,10 @@ beforeEach(() => resetClientState());
 afterEach(() => resetClientState());
 
 const listRoute: Routes = {
-  "GET /api/v1/dashboard/summary": () => ({ body: { data: { role: "EMPLOYEE", awaitingReview: 0, approved: 0, partiallyIssued: 0, fullyIssued: 0 } } }),
+  "GET /api/v1/auth/capabilities": () => ({ body: { data: { allowAdminIssue: false } } }),
+  "GET /api/v1/dashboard/summary": () => ({
+    body: { data: { role: "EMPLOYEE", awaitingReview: 0, approved: 0, partiallyIssued: 0, fullyIssued: 0 } },
+  }),
   "GET /api/v1/requests": () => ({ body: emptyList }),
   "GET /api/v1/requests/counts": () => ({
     body: {
@@ -122,6 +125,83 @@ describe("login", () => {
 });
 
 describe("role-based access", () => {
+  it("submits threshold, receipt and adjustment actions from inventory management", async () => {
+    const chemicalId = "11111111-1111-4111-8111-111111111111";
+    const packSizeId = "22222222-2222-4222-8222-222222222222";
+    const balance = {
+      id: "33333333-3333-4333-8333-333333333333",
+      chemicalId,
+      chemicalCode: "DEMO-1",
+      chemicalName: "Demo chemical",
+      storageLocation: "R-1",
+      chemicalActive: true,
+      packSizeId,
+      packLabel: "500 g",
+      unitType: "MASS",
+      baseUnit: "g",
+      baseQuantity: "500",
+      packActive: true,
+      onHandQuantity: 0,
+      reservedQuantity: 0,
+      availableQuantity: 0,
+      minimumQuantity: 5,
+      lowStock: true,
+      version: 1,
+      updatedAt: "2026-11-17T00:00:00.000Z",
+    };
+    const calls = mockFetch({
+      ...meRoute(makeUser("ADMIN")),
+      ...listRoute,
+      "GET /api/v1/inventory": () => ({
+        body: { data: [balance], meta: { page: 1, pageSize: 15, total: 1, totalPages: 1 } },
+      }),
+      "PATCH /api/v1/inventory/22222222-2222-4222-8222-222222222222/threshold": () => ({
+        body: { data: balance },
+      }),
+      "POST /api/v1/stock-transactions/receipts": () => ({ status: 201, body: { data: {} } }),
+      "POST /api/v1/stock-transactions/adjustments": () => ({ status: 201, body: { data: {} } }),
+    });
+    renderApp("/inventory");
+    const user = userEvent.setup();
+    await screen.findByText("Demo chemical");
+    await user.clear(screen.getByLabelText("Low-stock threshold"));
+    await user.type(screen.getByLabelText("Low-stock threshold"), "8");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await screen.findByText("1 inventory change saved.");
+    expect(calls.find((call) => call.method === "PATCH" && call.path.includes("/threshold"))?.body).toEqual({
+      minimumQuantity: 8,
+    });
+
+    await user.type(screen.getByRole("spinbutton", { name: "Receipt quantity in packs" }), "4");
+    await user.type(screen.getByRole("textbox", { name: "Receipt reference" }), "GRN-123");
+    await user.click(screen.getByRole("button", { name: "Add receipt" }));
+    expect(await screen.findByText(/Added receipt to pending changes/)).toBeInTheDocument();
+    expect(calls.some((call) => call.path.endsWith("/receipts"))).toBe(false);
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Adjustment direction" }), "OUT");
+    await user.type(screen.getByRole("spinbutton", { name: "Adjustment quantity in packs" }), "1");
+    await user.type(screen.getByRole("textbox", { name: "Adjustment reason" }), "Physical count correction");
+    await user.click(screen.getByRole("button", { name: "Add adjustment" }));
+    expect(await screen.findByText(/Added adjustment to pending changes/)).toBeInTheDocument();
+    expect(screen.getByText(/click save changes above the table to update stock/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await screen.findByText("2 inventory changes saved.");
+    expect(calls.find((call) => call.path.endsWith("/receipts"))?.body).toMatchObject({
+      chemicalId,
+      packSizeId,
+      quantity: 4,
+      reason: "GRN-123",
+    });
+    expect(calls.find((call) => call.path.endsWith("/adjustments"))?.body).toMatchObject({
+      chemicalId,
+      packSizeId,
+      quantity: 1,
+      direction: "OUT",
+    });
+  });
+
   it("shows an employee the empty first-use dashboard without admin areas", async () => {
     const calls = mockFetch({ ...meRoute(makeUser("EMPLOYEE")), ...listRoute });
     renderApp("/");
@@ -147,6 +227,16 @@ describe("role-based access", () => {
     expect(await screen.findByRole("heading", { name: "Access restricted" })).toBeInTheDocument();
   });
 
+  it("allows an administrator to use the issue desk only when the server capability permits it", async () => {
+    mockFetch({
+      ...meRoute(makeUser("ADMIN")),
+      ...listRoute,
+      "GET /api/v1/auth/capabilities": () => ({ body: { data: { allowAdminIssue: true } } }),
+    });
+    renderApp("/issue");
+    expect(await screen.findByRole("heading", { name: "Issue desk" })).toBeInTheDocument();
+  });
+
   it("opens the mobile navigation drawer from the menu button", async () => {
     mockFetch({ ...meRoute(makeUser("STOREKEEPER")), ...listRoute });
     renderApp("/");
@@ -155,6 +245,76 @@ describe("role-based access", () => {
     const drawer = await screen.findByRole("dialog");
     expect(within(drawer).getByRole("link", { name: "Issue desk" })).toBeInTheDocument();
     expect(within(drawer).queryByRole("link", { name: "New request" })).not.toBeInTheDocument();
+  });
+
+  it("shows the administrator workspace, operational metrics and implemented tools", async () => {
+    const user = makeUser("ADMIN");
+    mockFetch({
+      ...meRoute(user),
+      ...listRoute,
+      "GET /api/v1/dashboard/summary": () => ({
+        body: {
+          data: {
+            role: "ADMIN",
+            totalRequests: 18,
+            awaitingDecision: 3,
+            approved: 4,
+            partiallyIssued: 2,
+            fullyIssued: 5,
+            rejected: 4,
+            lowStockAlerts: 1,
+            pendingRequests: [],
+            recentActivity: [],
+            lowStockItems: [],
+            recentTransactions: [],
+          },
+        },
+      }),
+    });
+    renderApp("/");
+    expect(await screen.findByText("Total Requests")).toBeInTheDocument();
+    expect(screen.getByText("Low Stock Alerts")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review queue" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Inventory management" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "User management" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "New request" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "My requests" })).not.toBeInTheDocument();
+  });
+
+  it("shows the storekeeper issue workspace without approval or requester actions", async () => {
+    const user = makeUser("STOREKEEPER");
+    mockFetch({
+      ...meRoute(user),
+      ...listRoute,
+      "GET /api/v1/dashboard/summary": () => ({
+        body: {
+          data: {
+            role: "STOREKEEPER",
+            readyToIssue: 2,
+            partiallyIssued: 1,
+            issuedToday: 3,
+            lowStockAlerts: 1,
+            pendingIssueRequests: [],
+            recentHandovers: [],
+            lowStockItems: [],
+            recentTransactions: [],
+          },
+        },
+      }),
+    });
+    renderApp("/");
+    expect(await screen.findByText("Ready to Issue")).toBeInTheDocument();
+    expect(screen.getByText("Issued Today")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Issue desk" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Stock transactions" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Review queue" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "New request" })).not.toBeInTheDocument();
+  });
+
+  it("blocks employees from direct administrative management routes", async () => {
+    mockFetch({ ...meRoute(makeUser("EMPLOYEE")), ...listRoute });
+    renderApp("/users");
+    expect(await screen.findByRole("heading", { name: "Access restricted" })).toBeInTheDocument();
   });
 
   it("returns to sign-in with an explanation when the session expires mid-use", async () => {
@@ -532,6 +692,62 @@ describe("new request", () => {
 });
 
 describe("chemicals and status badges", () => {
+  it("submits chemical creation, detail edits and pack size forms", async () => {
+    const chemical = {
+      id: "chem-1",
+      chemicalCode: "DEMO-0001",
+      name: "Demo Acid A",
+      description: null,
+      category: "Acid",
+      hazardNotes: null,
+      storageLocation: "R-01",
+      minimumStockAlert: 0,
+      isActive: true,
+      createdAt: "2026-10-01T00:00:00.000Z",
+      updatedAt: "2026-10-01T00:00:00.000Z",
+      packSizes: [],
+    };
+    const calls = mockFetch({
+      ...meRoute(makeUser("ADMIN")),
+      "GET /api/v1/chemicals": () => ({ body: { data: [chemical], meta: { page: 1, pageSize: 10, total: 1, totalPages: 1 } } }),
+      "POST /api/v1/chemicals": () => ({ body: { data: chemical } }),
+      "PATCH /api/v1/chemicals/chem-1": () => ({ body: { data: chemical } }),
+      "POST /api/v1/chemicals/chem-1/pack-sizes": () => ({ body: { data: {} } }),
+    });
+    renderApp("/chemicals");
+    const user = userEvent.setup();
+    await screen.findByText("Demo Acid A");
+
+    await user.type(screen.getByLabelText("Chemical code"), "DEMO-NEW");
+    await user.type(screen.getByLabelText("Chemical name"), "New chemical");
+    await user.type(screen.getByLabelText("Pack label"), "250 ml");
+    await user.type(screen.getByLabelText("Base quantity"), "250");
+    await user.click(screen.getByRole("button", { name: "Create chemical" }));
+    await screen.findByText("Chemical and pack size created.");
+
+    await user.click(screen.getByText("Edit chemical details"));
+    await user.click(screen.getByRole("button", { name: "Save details" }));
+    await screen.findByText("Chemical details saved.");
+
+    await user.click(screen.getByText("Add pack size", { selector: "summary" }));
+    await user.type(screen.getByLabelText("New pack label for Demo Acid A"), "1 L");
+    await user.type(screen.getByLabelText("New pack base quantity for Demo Acid A"), "1000");
+    await user.click(screen.getByRole("button", { name: "Add pack size" }));
+    await screen.findByText("Pack size added.");
+
+    expect(calls.find((call) => call.method === "POST" && call.path === "/api/v1/chemicals")?.body).toMatchObject({
+      chemicalCode: "DEMO-NEW",
+      name: "New chemical",
+      packSizes: [{ label: "250 ml", baseQuantity: 250 }],
+    });
+    expect(calls.some((call) => call.method === "PATCH" && call.path === "/api/v1/chemicals/chem-1")).toBe(true);
+    expect(calls.find((call) => call.method === "POST" && call.path.endsWith("/pack-sizes"))?.body).toEqual({
+      label: "1 L",
+      unitType: "MASS",
+      baseQuantity: 1000,
+    });
+  });
+
   it("shows availability to employees but not on-hand detail", async () => {
     mockFetch({
       ...meRoute(makeUser("EMPLOYEE")),
